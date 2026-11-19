@@ -2,10 +2,10 @@ package cn.blockforge.generated.chunksmithchunksmithgu;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.forgespi.language.IModInfo;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforgespi.language.IModInfo;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,7 +67,7 @@ public final class PrereqStatus {
             ModList list = ModList.get();
             // 优先精确 id
             for (String id : new String[]{"chunksmith", "chunkysmith", "chunky"}) {
-                Optional<? extends net.minecraftforge.fml.ModContainer> c = list.getModContainerById(id);
+                Optional<? extends net.neoforged.fml.ModContainer> c = list.getModContainerById(id);
                 if (c.isPresent()) {
                     IModInfo info = c.get().getModInfo();
                     localModId = info.getModId();

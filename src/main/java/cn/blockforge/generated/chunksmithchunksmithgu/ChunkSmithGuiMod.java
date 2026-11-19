@@ -1,9 +1,8 @@
 package cn.blockforge.generated.chunksmithchunksmithgu;
 
 import cn.blockforge.generated.chunksmithchunksmithgu.net.Net;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
 
 /**
  * ChunkSmith 现代化指令面板 —— Forge 1.20.1 模组。
@@ -21,8 +20,7 @@ public final class ChunkSmithGuiMod {
     public static final String MOD_ID = "chunksmith_modern_gui";
     public static final String MOD_NAME = "Chunksmith modern gui";
 
-    public ChunkSmithGuiMod() {
-        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+    public ChunkSmithGuiMod(IEventBus modBus) {
 
         // —— 公共初始化（客户端 / 服务端都要） ——
         Settings.load();

@@ -190,7 +190,7 @@ public class PanelScreen extends Screen {
         dt = Math.max(0.001f, Math.min(0.1f, (now - lastFrameMs) / 1000f));
         lastFrameMs = now;
 
-        this.renderBackground(g);
+        this.renderBackground(g, mouseX, mouseY, partialTick);
         computeTransform();        double vx = (mouseX - ox) / scale;
         double vy = (mouseY - oy) / scale;
 
@@ -228,7 +228,7 @@ public class PanelScreen extends Screen {
      * 视觉几乎无差别，每帧少几十次整屏 fill 和一套模糊。
      */
     @Override
-    public void renderBackground(GuiGraphics g) {
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         g.fill(0, 0, this.width, this.height, 0x90000000);
     }
 
@@ -418,12 +418,12 @@ public class PanelScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double amount) {
+    public boolean mouseScrolled(double mx, double my, double scrollX, double scrollY) {
         computeTransform();
         double vx = (mx - ox) / scale, vy = (my - oy) / scale;
-        for (Widget w : widgets) if (w.active && w.visible && w.mouseScrolled(vx, vy, amount)) return true;
-        for (Widget w : chrome) if (w.active && w.visible && w.mouseScrolled(vx, vy, amount)) return true;
-        return super.mouseScrolled(mx, my, amount);
+        for (Widget w : widgets) if (w.active && w.visible && w.mouseScrolled(vx, vy, scrollY)) return true;
+        for (Widget w : chrome) if (w.active && w.visible && w.mouseScrolled(vx, vy, scrollY)) return true;
+        return super.mouseScrolled(mx, my, scrollX, scrollY);
     }
 
     @Override
@@ -458,7 +458,7 @@ public class PanelScreen extends Screen {
         if (focus != null) focus.setFocus(true);
     }
 
-    private void clearFocus() {
+    private void clearWidgetFocus() {
         if (focus != null) focus.setFocus(false);
         focus = null;
     }

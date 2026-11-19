@@ -1,20 +1,75 @@
-plugins { id 'java'; id 'net.minecraftforge.gradle' version '[6.0,6.2)' }
-version = '1.2.0-r32'
-group = 'cn.blockforge.generated.chunksmithchunksmithgu'
-base { archivesName = 'chunksmith_modern_gui' }
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
-minecraft { mappings channel: 'official', version: '1.20.1' }
-dependencies { minecraft 'net.minecraftforge:forge:1.20.1-47.4.0' }
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
-processResources {
-    def props = [mod_id: 'chunksmith_modern_gui', mod_name: 'Chunksmith modern gui', mod_version: project.version,
-                 minecraft_version: '1.20.1', forge_version: '47.4.0']
-    inputs.properties props
-    filteringCharset = 'UTF-8'
-    filesMatching('META-INF/mods.toml') { expand props }
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.141'
 }
-jar {
-    // 开源协议随包分发：作者 BarryAlen777
-    from('LICENSE') { into 'META-INF' }
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = 'chunksmith_modern_gui'
 }
-jar.finalizedBy('reobfJar')
+
+repositories.each { repo ->
+    def urlStr = repo.url.toString()
+    if (urlStr.contains('://maven.neoforged.net')) {
+        repo.url = uri(urlStr.replace('://maven.neoforged.net', '://neoforged.forgecdn.net'))
+    }
+}
+
+repositories {
+    maven { url = uri('https://maven.aliyun.com/repository/public') }
+    mavenCentral()
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

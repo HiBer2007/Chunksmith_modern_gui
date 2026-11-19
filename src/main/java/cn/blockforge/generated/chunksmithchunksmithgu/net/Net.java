@@ -10,11 +10,12 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.neoforged.neoforge.network.PacketDistributor;
+import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -45,7 +46,7 @@ import java.util.function.Supplier;
 public final class Net {
 
     public static final ResourceLocation CHANNEL_NAME =
-            new ResourceLocation(ChunkSmithGuiMod.MOD_ID, "panel_net");
+            ResourceLocation.fromNamespaceAndPath(ChunkSmithGuiMod.MOD_ID, "panel_net");
 
     /**
      * 通道协议号。改过包体结构就必须 +1，否则新旧客户端/服务端会按各自的格式去解析同一串字节
@@ -55,21 +56,45 @@ public final class Net {
      * <p>对端没装本模组（原版/他模服）仍然放行：通道是可选功能，不该拦握手。</p>
      */
     private static final String PROTOCOL = "2";
-    /** 对端缺席（没装本模组）或版本一致都放行。 */
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            CHANNEL_NAME, () -> PROTOCOL,
-            NetworkRegistry.acceptMissingOr(PROTOCOL),
-            NetworkRegistry.acceptMissingOr(PROTOCOL));
+    // 载荷在 RegisterPayloadHandlersEvent 里注册（见 register），不再有静态通道对象。
 
     private Net() {
     }
 
     public static void register(IEventBus modBus) {
-        int i = 0;
-        CHANNEL.registerMessage(i++, HandshakeC2S.class, HandshakeC2S::encode, HandshakeC2S::decode, Net::handleHandshake);
-        CHANNEL.registerMessage(i++, HandshakeS2C.class, HandshakeS2C::encode, HandshakeS2C::decode, Net::handleHandshakeResp);
-        CHANNEL.registerMessage(i++, HeatmapC2S.class, HeatmapC2S::encode, HeatmapC2S::decode, Net::handleHeatmap);
-        CHANNEL.registerMessage(i++, HeatmapS2C.class, HeatmapS2C::encode, HeatmapS2C::decode, Net::handleHeatmapResp);
+        modBus.addListener(Net::onRegisterPayloads);
+    }
+
+    /**
+     * 注册唯一载荷。{@code optional()} 对应上游的 acceptMissingOr：对端没装本模组时
+     * 通道缺席而不是拒绝握手，客户端单装也能进原版/他模服。
+     */
+    private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar(PROTOCOL).optional();
+        registrar.playBidirectional(PanelPayload.TYPE, PanelPayload.CODEC, Net::dispatch);
+    }
+
+    /** 按 id 分派回原来的四个处理函数；四条消息类的 encode/decode 完全没动。 */
+    private static void dispatch(PanelPayload payload, IPayloadContext ctx) {
+        var buf = payload.buffer();
+        switch (payload.id()) {
+            case 0 -> handleHandshake(HandshakeC2S.decode(buf), ctx);
+            case 1 -> handleHandshakeResp(HandshakeS2C.decode(buf), ctx);
+            case 2 -> handleHeatmap(HeatmapC2S.decode(buf), ctx);
+            case 3 -> handleHeatmapResp(HeatmapS2C.decode(buf), ctx);
+            default -> { }
+        }
+    }
+
+    /** 编码 + 包成载荷，供回复/下发复用。 */
+    public static PanelPayload envelopePublic(int id, java.util.function.BiConsumer<Object, FriendlyByteBuf> enc, Object msg) {
+        return envelope(id, enc, msg);
+    }
+
+    private static PanelPayload envelope(int id, java.util.function.BiConsumer<Object, FriendlyByteBuf> enc, Object msg) {
+        FriendlyByteBuf b = new FriendlyByteBuf(Unpooled.buffer());
+        enc.accept(msg, b);
+        return PanelPayload.of(id, b);
     }
 
     // ==================== 握手 ====================
@@ -109,11 +134,10 @@ public final class Net {
         }
     }
 
-    private static void handleHandshake(HandshakeC2S m, Supplier<NetworkEvent.Context> ctx) {
-        NetworkEvent.Context c = ctx.get();
+    private static void handleHandshake(HandshakeC2S m, IPayloadContext c) {
         String id = null, v = null;
         for (String probe : new String[]{"chunksmith", "chunkysmith", "chunky"}) {
-            var container = net.minecraftforge.fml.ModList.get().getModContainerById(probe);
+            var container = net.neoforged.fml.ModList.get().getModContainerById(probe);
             if (container.isPresent()) {
                 id = container.get().getModInfo().getModId();
                 v = container.get().getModInfo().getVersion().toString();
@@ -121,21 +145,20 @@ public final class Net {
             }
         }
         List<String> worlds = new ArrayList<>();
-        ServerPlayer sp = c.getSender();
+        ServerPlayer sp = (ServerPlayer) c.player();
         if (sp != null && sp.getServer() != null) {
             for (ResourceKey<Level> k : sp.getServer().levelKeys()) {
                 worlds.add(k.location().toString());
             }
         }
-        CHANNEL.reply(new HandshakeS2C(id, v, worlds), c);
-        c.setPacketHandled(true);
+        c.reply(envelope(1, (x, b) -> HandshakeS2C.encode((HandshakeS2C) x, b), new HandshakeS2C(id, v, worlds)));
+        
     }
 
     /** 世界（维度）下拉列表，客户端缓存。 */
     public static volatile List<String> serverWorlds = null;
 
-    private static void handleHandshakeResp(HandshakeS2C m, Supplier<NetworkEvent.Context> ctx) {
-        NetworkEvent.Context c = ctx.get();
+    private static void handleHandshakeResp(HandshakeS2C m, IPayloadContext c) {
         c.enqueueWork(() -> {
             serverWorlds = m.worlds;
             if (m.prereqId != null) {
@@ -155,7 +178,7 @@ public final class Net {
             }
             PrereqStatus.invalidateOkCache();
         });
-        c.setPacketHandled(true);
+        
     }
 
     // ==================== 热力图 ====================
@@ -258,27 +281,26 @@ public final class Net {
                 new int[0], new int[0], new byte[0][], reason);
     }
 
-    private static void handleHeatmap(HeatmapC2S m, Supplier<NetworkEvent.Context> ctx) {
-        NetworkEvent.Context c = ctx.get();
-        ServerPlayer sp = c.getSender();
-        if (sp == null) { c.setPacketHandled(true); return; }
+    private static void handleHeatmap(HeatmapC2S m, IPayloadContext c) {
+        ServerPlayer sp = (ServerPlayer) c.player();
+        if (sp == null) {  return; }
         MinecraftServer server = sp.getServer();
         // 拒绝包：空位图 + 带原因（报告 P2-2），客户端能区分"被拒"和"这个范围真没区块"
 
         // 权限：热力图暴露世界布局，至少要求一级 OP
         if (server == null || !sp.createCommandSourceStack().hasPermission(1)) {
-            CHANNEL.reply(deny(m, "需要服务端权限等级 1 以上"), c); c.setPacketHandled(true); return;
+            c.reply(envelope(3, (x, b) -> HeatmapS2C.encode((HeatmapS2C) x, b), deny(m, "需要服务端权限等级 1 以上")));  return;
         }
         // 维度必须真实存在（同时挡住任何路径拼接的尝试）
         ResourceKey<Level> levelKey = resolveLevel(server, m.dim);
         if (levelKey == null) {
-            CHANNEL.reply(deny(m, "维度不存在"), c); c.setPacketHandled(true); return;
+            c.reply(envelope(3, (x, b) -> HeatmapS2C.encode((HeatmapS2C) x, b), deny(m, "维度不存在")));  return;
         }
         // 每玩家冷却
         long now = System.currentTimeMillis();
         Long last = HEAT_LAST_REQ.get(sp.getUUID());
         if (last != null && now - last < HEAT_COOLDOWN_MS) {
-            CHANNEL.reply(deny(m, "请求太快，等几秒再试"), c); c.setPacketHandled(true); return;
+            c.reply(envelope(3, (x, b) -> HeatmapS2C.encode((HeatmapS2C) x, b), deny(m, "请求太快，等几秒再试")));  return;
         }
         if (HEAT_LAST_REQ.size() > 256) {
             long cutoff = now - HEAT_REQ_EXPIRY_MS;
@@ -301,15 +323,15 @@ public final class Net {
                 final HeatmapS2C payload = reply;
                 server.execute(() -> {
                     if (!sp.hasDisconnected()) {
-                        CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), payload);
+                        PacketDistributor.sendToPlayer(sp, envelope(3, (x, b) -> HeatmapS2C.encode((HeatmapS2C) x, b), payload));
                     }
                 });
             });
         } catch (RejectedExecutionException e) {
             // 队列已满：直接回带原因的拒绝包，避免积压
-            CHANNEL.reply(deny(m, "服务端扫描繁忙，稍后再试"), c);
+            c.reply(envelope(3, (x, b) -> HeatmapS2C.encode((HeatmapS2C) x, b), deny(m, "服务端扫描繁忙，稍后再试")));
         }
-        c.setPacketHandled(true);
+        
     }
 
     /** 在服务器真实维度里找 dim；找不到返回 null（拒绝任意字符串拼路径）。 */
@@ -322,8 +344,7 @@ public final class Net {
         return null;
     }
 
-    private static void handleHeatmapResp(HeatmapS2C m, Supplier<NetworkEvent.Context> ctx) {
-        NetworkEvent.Context c = ctx.get();
+    private static void handleHeatmapResp(HeatmapS2C m, IPayloadContext c) {
         c.enqueueWork(() -> {
             if (m.requestId != PanelState.heatRequestId) return;
             // 被拒时给可读原因（报告 P2-2）：之前"权限不足/冷却/维度不存在"和
@@ -347,7 +368,7 @@ public final class Net {
             }
             PanelState.heat = new PanelState.HeatData(set, m.dim, m.half, System.currentTimeMillis());
         });
-        c.setPacketHandled(true);
+        
     }
 
     // ==================== region 扫描实现（服务端/单人共用） ====================
@@ -435,3 +456,4 @@ public final class Net {
         return r;
     }
 }
+

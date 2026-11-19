@@ -16,7 +16,7 @@ public final class ChunkSmithGuiPaths {
 
     /** 游戏运行目录（run directory）。客户端与服务端同一取法。 */
     public static Path gameDir() {
-        return net.minecraftforge.fml.loading.FMLPaths.GAMEDIR.get();
+        return net.neoforged.fml.loading.FMLPaths.GAMEDIR.get();
     }
 
     public static Path configDir() {

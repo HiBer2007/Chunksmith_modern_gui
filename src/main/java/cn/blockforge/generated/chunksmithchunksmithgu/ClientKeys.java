@@ -4,8 +4,8 @@ import cn.blockforge.generated.chunksmithchunksmithgu.gui.PanelScreen;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -27,9 +27,8 @@ public final class ClientKeys {
     /** forge 总线上的客户端 tick 监听。 */
     public static final class TickEvents {
         @SubscribeEvent
-        public void onTick(TickEvent.ClientTickEvent e) {
-            if (e.phase != TickEvent.Phase.END) return;
-            Minecraft mc = Minecraft.getInstance();
+        public void onTick(ClientTickEvent.Post e) {
+                Minecraft mc = Minecraft.getInstance();
             if (mc.level == null || mc.player == null) return;
 
             // P 键只在“没有界面打开”时负责【打开】面板；

@@ -1,11 +1,11 @@
 package cn.blockforge.generated.chunksmithchunksmithgu;
 
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 
 /**
  * 客户端专属入口。
@@ -20,8 +20,8 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
  *   <li>{@link FMLClientSetupEvent}（模组总线）→ 挂上聊天回包捕获和每 tick 的按键轮询。</li>
  * </ul></p>
  */
-@Mod.EventBusSubscriber(modid = ChunkSmithGuiMod.MOD_ID,
-        bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = ChunkSmithGuiMod.MOD_ID,
+        bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class ClientSetup {
 
     private ClientSetup() {
@@ -37,7 +37,7 @@ public final class ClientSetup {
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         LogCapture.init();
-        MinecraftForge.EVENT_BUS.register(new ClientKeys.TickEvents());
+        NeoForge.EVENT_BUS.register(new ClientKeys.TickEvents());
         PanelState.warmUpSets();   // 把 /cs set 备份历史从配置目录读回内存
         event.enqueueWork(ClientSetup::defaultLanguageOnce);
     }

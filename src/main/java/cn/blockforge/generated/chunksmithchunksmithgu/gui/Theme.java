@@ -20,7 +20,7 @@ public final class Theme {
     public static final ResourceLocation CORNER = rl("corner_flora");
 
     private static ResourceLocation rl(String name) {
-        return new ResourceLocation(ChunkSmithGuiMod.MOD_ID, "textures/gui/" + name + ".png");
+        return ResourceLocation.fromNamespaceAndPath(ChunkSmithGuiMod.MOD_ID, "textures/gui/" + name + ".png");
     }
 
     // ---- 调色板（ARGB），取自参考图 ----

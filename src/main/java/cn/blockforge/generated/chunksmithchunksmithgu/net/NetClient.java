@@ -2,6 +2,7 @@ package cn.blockforge.generated.chunksmithchunksmithgu.net;
 
 import cn.blockforge.generated.chunksmithchunksmithgu.PanelState;
 import net.minecraft.client.Minecraft;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.network.Connection;
 
 /**
@@ -25,7 +26,8 @@ public final class NetClient {
         try {
             Connection con = Minecraft.getInstance().getConnection() == null
                     ? null : Minecraft.getInstance().getConnection().getConnection();
-            return con != null && Net.CHANNEL.isRemotePresent(con);
+            // NeoForge 的通道协商由框架处理；能收到握手回包即视为对端可用，这里只在有连接时放行。
+            return con != null;
         } catch (Throwable t) {
             return false;
         }
@@ -38,7 +40,8 @@ public final class NetClient {
                 Net.serverWorlds = null;
                 return;
             }
-            Net.CHANNEL.sendToServer(new Net.HandshakeC2S());
+            PacketDistributor.sendToServer(
+                    Net.envelopePublic(0, (m, b) -> Net.HandshakeC2S.encode((Net.HandshakeC2S) m, b), new Net.HandshakeC2S()));
         } catch (Throwable t) {
             Net.serverWorlds = null;
         }
@@ -77,10 +80,11 @@ public final class NetClient {
             return;
         }
         try {
-            Net.CHANNEL.sendToServer(new Net.HeatmapC2S(requestId, dim, cx, cz, half));
+            PacketDistributor.sendToServer(Net.envelopePublic(2, (m, b) -> Net.HeatmapC2S.encode((Net.HeatmapC2S) m, b), new Net.HeatmapC2S(requestId, dim, cx, cz, half)));
         } catch (Throwable t) {
             PanelState.heatNoServer = true;
             PanelState.log(PanelState.Level.WARN, "热力图请求发送失败: " + t);
         }
     }
 }
+

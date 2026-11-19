@@ -4,9 +4,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraftforge.client.event.ClientChatReceivedEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ClientChatReceivedEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.bus.api.SubscribeEvent;
 
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -124,7 +124,7 @@ public final class LogCapture {
     }
 
     public static void init() {
-        MinecraftForge.EVENT_BUS.register(INSTANCE);
+        NeoForge.EVENT_BUS.register(INSTANCE);
     }
 
     @SubscribeEvent
